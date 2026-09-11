@@ -38,11 +38,26 @@ class Authenticator:
         return (True, "Account created. You can log in now.") if ok else (False, "Could not create account.")
 
     def login(self, username: str, password: str) -> tuple[bool, str]:
-        user = self._db.get_user((username or "").strip())
+        username = (username or "").strip()
+
+        # BRUTE-FORCE CHECK: Ask the DB if this user is currently in a time-out
+        locked, seconds_remaining = self._db.is_locked_out(username)
+        if locked:
+            minutes = max(1, seconds_remaining // 60)
+            return False, f"Account temporarily locked due to repeated failed attempts. Try again in ~{minutes} min."
+
+        user = self._db.get_user(username)
         if not user:
             return False, "Invalid username or password."
-        expected_hash = self._hash_password(password, user["salt"]) #Re-hash the provided plaintext password using the unique salt stored in this user's DB row
-        #Security validation: Use secrets.compare_digest for constant-time comparison.
-        if secrets.compare_digest(expected_hash, user["password_hash"]):
+        #Re-hash the provided plaintext password using the unique salt stored in this user's DB
+        expected_hash = self._hash_password(password, user.salt)
+
+        #Security validation: Use secrets.compare_digest for constant-time comparison. 
+        if secrets.compare_digest(expected_hash, user.password_hash):
+            # SUCCESS: Reset the brute-force failure counter to 0
+            self._db.record_successful_login(username)
             return True, "Login successful."
+
+        #FAILURE: Increment the brute-force failure counter
+        self._db.record_failed_login(username)
         return False, "Invalid username or password."
