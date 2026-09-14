@@ -13,11 +13,12 @@ load_dotenv()
 
 @dataclass(frozen=True)
 class Config:
-    # --- Ollama (local) ---
+    # --- Ollama ---
     OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     OLLAMA_CHAT_MODEL: str = os.getenv("OLLAMA_CHAT_MODEL", "llama3.2:1b")   # light model
     OLLAMA_EMBED_MODEL: str = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
-
+    OLLAMA_TIMEOUT_SECONDS: float = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "60")) #don't hang forever if the local model stalls
+    
     # --- Guardrails (input/output size checks) ---
     MAX_INPUT_CHARS: int = 4000          # reject user input longer than this
     MIN_INPUT_CHARS: int = 1
@@ -27,7 +28,9 @@ class Config:
     # --- Memory (bounded) ---
     MEMORY_MAX_MESSAGES: int = 20        # max turns kept in short-term memory
     MEMORY_MAX_TOKENS: int = 3000        # approx token budget for short-term memory
+    MEMORY_SUMMARY_MAX_CHARS: int = 2000 # hard cap on the rolling summary of aged-out turns
     RAG_TOP_K: int = 3                   # similar past messages to retrieve from Chroma
+    RAG_MAX_CHARS_PER_CHUNK: int = 500   # hard cap per retrieved chunk so can't blow the token budget
 
     # --- Storage ---
     SQLITE_DB_PATH: str = os.getenv("SQLITE_DB_PATH", "data/app.db")
