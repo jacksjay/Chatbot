@@ -31,6 +31,8 @@ class VectorMemoryStore:
         # PersistentClient saves the vectors to disk so they survive server reboots
         self._client = chromadb.PersistentClient(path=persist_dir)
         self._embedder = OllamaEmbeddingFunction()
+        
+    @staticmethod
     def _collection_name(user_id: int) -> str:
         """
         DATA ISOLATION: Generates a perfectly safe, standardized collection name.

@@ -1,9 +1,7 @@
 """
 Lightweight input/output validation and sanitisation.
-
-Not a substitute for a full safety pipeline — this checks size limits,
-blank input, and strips obvious script tags. Enough for a local
-functionality-testing chatbot; swap in a moderation model later if needed.
+this checks size limits,
+blank input, and strips obvious script tags.
 """
 import re
 from dataclasses import dataclass
