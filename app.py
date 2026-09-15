@@ -195,6 +195,7 @@ class ChatApp:
         system_prompt = CFG.SYSTEM_PROMPT
         if retrieved:
             context_block = "\n".join(f"- {chunk}" for chunk in retrieved)
+            # Slices the entire combined block of retrieved memories to an absolute ceiling limit
             context_block = context_block[:_MAX_RAG_CONTEXT_CHARS]
             system_prompt += (
                 "\n\nBelow is prior conversation history for reference only. "

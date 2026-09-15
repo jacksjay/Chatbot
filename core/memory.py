@@ -37,9 +37,9 @@ class ConversationMemory:
     def _trim(self) -> None:
         """Enforces limits. When a message is removed to save space, we could pass it to the summary."""
         while len(self._buffer) > self._max_messages:
-            self._buffer.popleft()
+            self._roll_into_summary(self._buffer.popleft())
         while self._total_tokens() > self._max_tokens and len(self._buffer) > 1:
-            self._buffer.popleft()
+            self._roll_into_summary(self._buffer.popleft())
 
     def _roll_into_summary(self, message: Message) -> None:
         """Instead of completely forgetting old messages, 
