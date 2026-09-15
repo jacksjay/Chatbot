@@ -48,7 +48,6 @@ class LLMLog(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     # FOREIGN KEY: Instead of storing the string 'username', we link to the User table's ID. 
-    # This is much faster and saves massive amounts of storage space.
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     model: Mapped[str] = mapped_column(String(128), nullable=False)
     prompt_tokens: Mapped[int] = mapped_column(Integer, default=0)
@@ -128,7 +127,7 @@ class DatabaseManager:
 
     def _resolve_user_id(self, session: Session, username: str) -> Optional[int]:
         """Converts a username string into an integer user_id quickly."""
-        # 1. Check RAM (Cache) first - insanely fast
+        # 1. Check RAM (Cache) first (fast)
         with self._cache_lock:
             cached = self._user_id_cache.get(username)
         if cached is not None:

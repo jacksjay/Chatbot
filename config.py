@@ -1,7 +1,5 @@
-"""
-Central configuration for the chatbot application.
-Tune behaviour here without touching business logic elsewhere.
-"""
+"""Central configuration for the chatbot application."""
+
 import os
 from dataclasses import dataclass
 
@@ -18,7 +16,7 @@ class Config:
     OLLAMA_CHAT_MODEL: str = os.getenv("OLLAMA_CHAT_MODEL", "llama3.2:1b")   # light model
     OLLAMA_EMBED_MODEL: str = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
     OLLAMA_TIMEOUT_SECONDS: float = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "60")) #don't hang forever if the local model stalls
-    
+
     # --- Guardrails (input/output size checks) ---
     MAX_INPUT_CHARS: int = 4000          # reject user input longer than this
     MIN_INPUT_CHARS: int = 1
