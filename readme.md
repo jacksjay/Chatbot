@@ -10,7 +10,6 @@ An enterprise-ready, locally hosted Retrieval-Augmented Generation (RAG) chatbot
 ### 🛡️ Security & Authentication
 * **Secure Auth:** Passwords are hashed using PBKDF2-HMAC-SHA256 with per-user salts. Constant-time comparisons are used to prevent timing attacks.
 * **Brute-Force Protection:** Accounts are automatically locked for 15 minutes after 5 failed login attempts.
-* **Persistent Sessions:** Utilizes URL token-based routing (or cookies) to survive browser refreshes without logging the user out.
 * **Prompt Injection Defense:** Uses regex heuristics to detect jailbreak attempts (e.g., *"Ignore all previous instructions"*). Malicious prompts trigger a "Hard Block"—the LLM is bypassed entirely, returning a canned refusal, and the input is prevented from entering long-term memory.
 
 ### 💾 Database (SQLAlchemy + SQLite WAL)
