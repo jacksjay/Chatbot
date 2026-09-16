@@ -92,6 +92,14 @@ class ChatApp:
                     #Get the user id from db
                     user_record = self._db.get_user(st.session_state.username)
                     st.session_state.user_id = user_record.id
+                    # Auto-load their most recent chat session ---
+                    try:
+                        past_sessions = self._db.get_all_sessions(st.session_state.username)
+                        if past_sessions:
+                            # Set the session ID to their most recent chat
+                            st.session_state.session_id = past_sessions[0]
+                    except Exception as exc:
+                        _logger.warning("Failed to fetch sessions on login: %s", exc)
                     self._restore_history()
                     st.rerun() # Force Streamlit to refresh the page to hide the login screen
                 else:
@@ -140,15 +148,51 @@ class ChatApp:
 
             st.divider()
 
+            # CHAT HISTORY DROPDOWN ---
+            st.subheader("Past Conversations")
+            try:
+                past_sessions = self._db.get_all_sessions(st.session_state.username)
+            except Exception:
+                past_sessions = []
+
+            if past_sessions:
+                # Add the current session to the list if it's brand new and not in the DB yet
+                if st.session_state.session_id not in past_sessions:
+                    past_sessions.insert(0, st.session_state.session_id)
+
+                # Format the UUIDs to look cleaner in the dropdown (e.g., "Chat: 123e4567...")
+                display_names = {s: f"Chat: {s[:8]}..." for s in past_sessions}
+                if st.session_state.session_id == past_sessions[0] and len(st.session_state.ui_messages) == 0:
+                    display_names[st.session_state.session_id] = "Current (New Chat)"
+
+                selected_session = st.selectbox(
+                    "Select a chat to resume",
+                    options=past_sessions,
+                    format_func=lambda x: display_names.get(x, x),
+                    index=past_sessions.index(st.session_state.session_id)
+                )
+
+                # If they selected a different chat, switch to it!
+                if selected_session != st.session_state.session_id:
+                    st.session_state.session_id = selected_session
+                    st.session_state.memory.clear()
+                    st.session_state.ui_messages = []
+                    self._restore_history()
+                    st.rerun()
+            else:
+                st.caption("No past chats found.")
+
+            st.divider()
+
             if st.button("🧹 New conversation", use_container_width=True):
                 #Reset everything to start a blank slate chat
                 st.session_state.memory.clear()
                 st.session_state.ui_messages = []
                 st.session_state.session_id = str(uuid.uuid4())
-                try:
-                    self._vectors.reset(st.session_state.user_id)
-                except Exception as exc:
-                    _logger.warning("vector reset failed: %s", exc)
+                # try:
+                #     self._vectors.reset(st.session_state.user_id)
+                # except Exception as exc:
+                #     _logger.warning("vector reset failed: %s", exc)
                 st.rerun()
             #Observability Panel 
             with st.expander("Recent call logs"):
@@ -221,9 +265,12 @@ class ChatApp:
             return
         user_text = result.value
 
-        if guardrails.flag_possible_injection(user_text):
-            _logger.warning("possible prompt-injection phrasing from user=%s: %r", username, user_text[:200])
-        
+        #Check if the user is trying a jailbreak 
+        flagged = guardrails.flag_possible_injection(user_text)
+        # if guardrails.flag_possible_injection(user_text):
+        #     _logger.warning("possible prompt-injection phrasing from user=%s: %r", username, user_text[:200])
+        if flagged:
+            _logger.warning("PROMPT INJECTION BLOCKED from user=%s: %r", username, user_text[:200])
         # 2. Show + persist + embed the user turn
         st.session_state.ui_messages.append({"role": "user", "content": user_text})
         with st.chat_message("user"):
@@ -233,9 +280,32 @@ class ChatApp:
             self._db.save_message(username, session_id, "user", user_text)
         except Exception as exc:
             _logger.warning("save_message (user) failed: %s", exc)
+
+        #SHORT-CIRCUIT: If it was flagged as an attack, HALT the pipeline here!
+        if flagged:
+            # Create a canned, safe refusal message
+            refusal = (
+                "Sorry, I can't help with that request — it looks like an "
+                "attempt to override my instructions or reveal internal "
+                "configuration, which I'm not able to disclose."
+            )
+            
+            # Print the refusal to the UI
+            with st.chat_message("assistant"):
+                st.markdown(refusal)
+            st.session_state.ui_messages.append({"role": "assistant", "content": refusal})
+            
+            # Save the refusal to memory and SQLite
+            memory.add("assistant", refusal)
+            try:
+                self._db.save_message(username, session_id, "assistant", refusal)
+            except Exception as exc:
+                _logger.warning("save_message (blocked-turn assistant) failed: %s", exc)
+            #Because we return here, the LLM is never called    
+            return
     
         #self._vectors.add_turn(username, "user", user_text)
-        self._vectors.add_turn(user_id, "user", user_text)
+        self._vectors.add_turn(user_id, "user", user_text) #embed non-flagged user turns into Long-Term Memory
 
         # 3. Retrieve relevant long-term context from Chroma (RAG-lite)
         #retrieved = self._vectors.retrieve_relevant(username, user_text)

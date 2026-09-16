@@ -264,3 +264,18 @@ class DatabaseManager:
             
             stmt = select(ChatMessage).where(ChatMessage.user_id == user_id, ChatMessage.session_id == session_id).order_by(ChatMessage.id.asc())
             return list(session.scalars(stmt))
+
+    def get_all_sessions(self, username: str) -> list[str]:
+        """Fetches all past chat session IDs for a user, ordered by most recent activity."""
+        with self._session() as session:
+            user_id = self._resolve_user_id(session, username)
+            if user_id is None: return []
+            
+            # Group by session_id and sort by the latest message timestamp in that session
+            stmt = (
+                select(ChatMessage.session_id)
+                .where(ChatMessage.user_id == user_id)
+                .group_by(ChatMessage.session_id)
+                .order_by(func.max(ChatMessage.timestamp).desc())
+            )
+            return list(session.scalars(stmt))
