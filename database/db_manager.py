@@ -3,7 +3,7 @@ import threading
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Iterator, Optional, Generator
 
 # SQLAlchemy imports - 
 from sqlalchemy import (
@@ -142,7 +142,7 @@ class DatabaseManager:
         return user_id
 
     @contextmanager
-    def _session(self) -> Iterator[Session]:
+    def _session(self) -> Generator[Session, None, None]:
         """Borrows a connection from the pool, does the work, and returns it."""
         session = self._SessionLocal()
         try:
