@@ -1,7 +1,7 @@
 
 import threading
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator, Optional, Generator
 
@@ -31,7 +31,7 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(128), nullable=False)
     salt: Mapped[str] = mapped_column(String(32), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
 
     # --- Brute-force protection fields ---
     failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -59,7 +59,7 @@ class LLMLog(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     error: Mapped[str] = mapped_column(Text, default="")
     # index=True speeds up queries when we ask for "Recent logs"
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utcnow), nullable=False, index=True)
 
     user: Mapped["User"] = relationship(back_populates="llm_logs")
 
@@ -72,12 +72,12 @@ class ChatMessage(Base):
     session_id: Mapped[str] = mapped_column(String(64), nullable=False)
     role: Mapped[str] = mapped_column(String(16), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.now(timezone.utc), nullable=False)
 
     user: Mapped["User"] = relationship(back_populates="messages")
 
     # Composite Index: Since we frequently search by BOTH user_id and session_id simultaneously,
-    # this combined index makes that specific search lightning fast.
+    # this combined index makes that specific search fast.
     __table_args__ = (Index("ix_chat_messages_user_session", "user_id", "session_id"),)
 
 
@@ -190,8 +190,8 @@ class DatabaseManager:
                 return False, None
                 
             # If the lockout timer hasn't expired yet
-            if user.locked_until > datetime.utcnow():
-                remaining = int((user.locked_until - datetime.utcnow()).total_seconds())
+            if user.locked_until > datetime.now(timezone.utc):
+                remaining = int((user.locked_until - datetime.now(timezone.utc)).total_seconds())
                 return True, remaining
             return False, None
 
@@ -203,7 +203,7 @@ class DatabaseManager:
             user.failed_login_attempts += 1
             # Lock the account if they cross the threshold
             if user.failed_login_attempts >= self.MAX_FAILED_ATTEMPTS:
-                user.locked_until = datetime.utcnow() + timedelta(minutes=self.LOCKOUT_MINUTES)
+                user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=self.LOCKOUT_MINUTES)
 
     def record_successful_login(self, username: str) -> None:
         """Resets the failure counters on a successful login."""
